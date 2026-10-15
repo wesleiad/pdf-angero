@@ -14,6 +14,7 @@ fn main() {
     }
     let mut res = winresource::WindowsResource::new();
     res.set("ProductName", "PDF - Angerô")
+        .set("CompanyName", "Grupo Angerô")
         .set("FileDescription", "PDF - Angerô")
         .set("LegalCopyright", "Grupo Angerô. MIT OR Apache-2.0 (ver NOTICE).")
         .set("OriginalFilename", "pdf-angero-cli.exe")
