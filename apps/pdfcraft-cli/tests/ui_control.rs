@@ -1,4 +1,4 @@
-//! `pdfcraft-cli ui --control FILE`: commands go only to an app whose control file is plausibly
+//! `pdf-angero-cli ui --control FILE`: commands go only to an app whose control file is plausibly
 //! the user's own. Another local user can create a file at a shared path such as `/tmp/pc.json`
 //! first, naming their own port and token; the CLI must not then send them typed text or trust
 //! their replies.

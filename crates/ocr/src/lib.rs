@@ -304,7 +304,7 @@ mod tests {
     fn finds_the_models_in_every_release_package_layout() {
         let base = std::env::temp_dir().join(format!("pdfcraft-ocr-layouts-{}", std::process::id()));
         let layouts = [
-            ("windows", "PdfCraft", "PdfCraft/models"),
+            ("windows", "PDF-Angero", "PdfCraft/models"),
             ("macos", "PdfCraft.app/Contents/MacOS", "PdfCraft.app/Contents/Resources/models"),
             ("linux-deb-rpm", "usr/bin", "usr/share/pdfcraft/models"),
             ("linux-tar", "pdfcraft-1.0.0-linux-x86_64/bin", "pdfcraft-1.0.0-linux-x86_64/share/pdfcraft/models"),

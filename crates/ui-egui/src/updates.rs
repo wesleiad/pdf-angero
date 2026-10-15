@@ -12,7 +12,7 @@ use egui::{Align, Layout};
 use crate::{PdfCraftApp, theme, widgets};
 
 /// Where every PdfCraft release is listed.
-pub const RELEASES_PAGE: &str = "https://github.com/storytold/pdfcraft/releases";
+pub const RELEASES_PAGE: &str = "https://github.com/wesleiad/pdf-angero";
 
 /// The latest published release.
 #[derive(Clone, Debug, PartialEq, Eq)]

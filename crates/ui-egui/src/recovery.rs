@@ -52,7 +52,7 @@ impl RecoveryStore {
         if cfg!(target_os = "macos") {
             env("HOME").map(|h| h.join("Library/Application Support/PdfCraft/Recovery"))
         } else if cfg!(windows) {
-            env("LOCALAPPDATA").map(|d| d.join("PdfCraft").join("Recovery"))
+            env("LOCALAPPDATA").map(|d| d.join("PDF - Angerô").join("Recovery"))
         } else {
             env("XDG_DATA_HOME").or_else(|| env("HOME").map(|h| h.join(".local/share"))).map(|d| d.join("pdfcraft/recovery"))
         }

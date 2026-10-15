@@ -1,5 +1,5 @@
-//! Windows only: embed version info (VERSIONINFO) into `pdfcraft-cli.exe`, so Explorer's
-//! Details tab, `(Get-Item pdfcraft-cli.exe).VersionInfo` and inventory tools can read the version
+//! Windows only: embed version info (VERSIONINFO) into `pdf-angero-cli.exe`, so Explorer's
+//! Details tab, `(Get-Item pdf-angero-cli.exe).VersionInfo` and inventory tools can read the version
 //! and publisher, as they can for `pdfcraft.exe` (`apps/pdfcraft/build.rs`).
 //!
 //! On every other target this does nothing. A missing resource compiler is a warning, so a
@@ -13,16 +13,16 @@ fn main() {
         return;
     }
     let mut res = winresource::WindowsResource::new();
-    res.set("ProductName", "PdfCraft")
-        .set("FileDescription", "PdfCraft command-line tool")
-        .set("LegalCopyright", "Copyright (c) the PdfCraft contributors. MIT OR Apache-2.0.")
-        .set("OriginalFilename", "pdfcraft-cli.exe")
-        .set("InternalName", "pdfcraft-cli");
+    res.set("ProductName", "PDF - Angerô")
+        .set("FileDescription", "PDF - Angerô")
+        .set("LegalCopyright", "Grupo Angerô. MIT OR Apache-2.0 (ver NOTICE).")
+        .set("OriginalFilename", "pdf-angero-cli.exe")
+        .set("InternalName", "pdf-angero-cli");
     if let Err(e) = res.compile() {
         if std::env::var_os("PDFCRAFT_REQUIRE_WINRES").is_some() {
             println!("cargo::error=embedding Windows resources failed: {e}");
             return;
         }
-        println!("cargo:warning=pdfcraft-cli.exe built without version resources: {e}");
+        println!("cargo:warning=pdf-angero-cli.exe built without version resources: {e}");
     }
 }

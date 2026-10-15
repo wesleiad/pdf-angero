@@ -1,4 +1,4 @@
-//! `pdfcraft-cli run --root`: a script's image output stays inside the root (#137).
+//! `pdf-angero-cli run --root`: a script's image output stays inside the root (#137).
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};

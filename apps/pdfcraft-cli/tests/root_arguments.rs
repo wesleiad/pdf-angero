@@ -55,7 +55,7 @@ fn malformed_root_fails_before_a_script_can_overwrite_a_file() {
         for script_name in ["steps.json", "missing.json"] {
             let out = Command::new(BIN).current_dir(&dir.0).args(["run", "--script", script_name]).args(&flags).output().unwrap();
             assert_eq!(out.status.code(), Some(1), "{script_name} {flags:?} unexpectedly succeeded");
-            assert_eq!(String::from_utf8(out.stderr).unwrap().trim(), format!("pdfcraft-cli: run: {diagnostic}"));
+            assert_eq!(String::from_utf8(out.stderr).unwrap().trim(), format!("pdf-angero-cli: run: {diagnostic}"));
             assert!(out.stdout.is_empty(), "a refused command must not execute or report tool results");
             assert_eq!(std::fs::read(&destination).unwrap(), CANARY);
             assert!(!dir.0.join("escaped.png").exists());
@@ -68,7 +68,7 @@ fn malformed_root_fails_before_a_script_can_overwrite_a_file() {
 fn malformed_root_fails_before_direct_tool_argument_validation() {
     let out = Command::new(BIN).args(["run", "doc_open", "not-key-value", "--root"]).output().unwrap();
     assert_eq!(out.status.code(), Some(1));
-    assert_eq!(String::from_utf8(out.stderr).unwrap().trim(), "pdfcraft-cli: run: --root needs a directory value");
+    assert_eq!(String::from_utf8(out.stderr).unwrap().trim(), "pdf-angero-cli: run: --root needs a directory value");
     assert!(out.stdout.is_empty());
 }
 
@@ -115,7 +115,7 @@ fn malformed_root_never_starts_or_initializes_an_mcp_server() {
         let _ = child.stdin.take().unwrap().write_all(b"{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{}}\n");
         let out = child.wait_with_output().unwrap();
         assert_eq!(out.status.code(), Some(1), "{flags:?} unexpectedly started the server");
-        assert_eq!(String::from_utf8(out.stderr).unwrap().trim(), format!("pdfcraft-cli: mcp: {diagnostic}"));
+        assert_eq!(String::from_utf8(out.stderr).unwrap().trim(), format!("pdf-angero-cli: mcp: {diagnostic}"));
         assert!(out.stdout.is_empty(), "a refused server must not answer initialize");
     }
 }

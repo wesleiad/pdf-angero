@@ -35,7 +35,7 @@ fn tmp(test: &str, name: &str) -> PathBuf {
     d.join(name)
 }
 
-/// The page rotation `pdfcraft-cli info` reports for the first page, via the inspector.
+/// The page rotation `pdf-angero-cli info` reports for the first page, via the inspector.
 fn first_page_rotation(path: &std::path::Path) -> u16 {
     let bytes = std::sync::Arc::new(std::fs::read(path).unwrap());
     pdfcraft_render::inspect(bytes, None).unwrap().pages[0].rotation
@@ -133,7 +133,7 @@ mod one_based_arguments {
                 ] {
                     let out = Command::new(BIN).current_dir(&dir.0).args([command, input, "--out", destination, option, value]).output().unwrap();
                     assert_eq!(out.status.code(), Some(1), "{command} {input} {option} {value}");
-                    assert_eq!(out.stderr, format!("pdfcraft-cli: {diagnostic}\n").as_bytes());
+                    assert_eq!(out.stderr, format!("pdf-angero-cli: {diagnostic}\n").as_bytes());
                     assert!(out.stdout.is_empty());
                     assert_eq!(std::fs::read(dir.0.join("input.pdf")).unwrap(), source);
                     assert_eq!(std::fs::read(dir.0.join("output.pam")).unwrap(), b"keep destination");
@@ -194,7 +194,7 @@ fn a_destination_past_the_end_fails_and_writes_nothing() {
     ] {
         let out = Command::new(BIN).args(["edit", input.to_str().unwrap(), "--out", output.to_str().unwrap(), option, value]).output().unwrap();
         assert_eq!(out.status.code(), Some(1), "{option} {value}");
-        assert_eq!(String::from_utf8_lossy(&out.stderr), format!("pdfcraft-cli: {diagnostic}\n"), "{option} {value}");
+        assert_eq!(String::from_utf8_lossy(&out.stderr), format!("pdf-angero-cli: {diagnostic}\n"), "{option} {value}");
         assert!(!output.exists(), "{option} {value}: no output may be written");
     }
 }

@@ -1,4 +1,4 @@
-//! `pdfcraft-cli mcp --compact`: the flag reaches the server, `--root` is still honoured, and plain `mcp` still lists every tool.
+//! `pdf-angero-cli mcp --compact`: the flag reaches the server, `--root` is still honoured, and plain `mcp` still lists every tool.
 #![cfg(feature = "mcp")]
 
 use std::io::Write as _;
@@ -6,7 +6,7 @@ use std::process::{Command, Stdio};
 
 use serde_json::{Value, json};
 
-/// Run `pdfcraft-cli mcp <flags>` over an initialize request plus `requests` and return the replies to `requests`.
+/// Run `pdf-angero-cli mcp <flags>` over an initialize request plus `requests` and return the replies to `requests`.
 fn session(flags: &[&str], requests: &[Value]) -> Vec<Value> {
     let mut child = Command::new(env!("CARGO_BIN_EXE_pdfcraft-cli"))
         .arg("mcp")
@@ -31,7 +31,7 @@ fn request(id: u64, method: &str, params: Value) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params })
 }
 
-/// The `tools/list` tool names of `pdfcraft-cli mcp <flags>`.
+/// The `tools/list` tool names of `pdf-angero-cli mcp <flags>`.
 fn listed_tools(flags: &[&str]) -> Vec<String> {
     let reply = session(flags, &[request(1, "tools/list", json!({}))]).remove(0);
     reply["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect()
