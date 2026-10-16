@@ -1447,7 +1447,9 @@ impl DocView {
                 }
             } else {
                 let bytes = rgba_bytes(device_pixels(p.width, req.scale) as usize, device_pixels(p.height, req.scale) as usize);
-                if (!visible && (page_bytes.saturating_add(bytes) > limite_paginas() || pages.len() >= max_paginas_guardadas())) || !pages.insert(req.page) {
+                if (!visible && (page_bytes.saturating_add(bytes) > limite_paginas() || pages.len() >= max_paginas_guardadas()))
+                    || !pages.insert(req.page)
+                {
                     continue;
                 }
                 page_bytes = page_bytes.saturating_add(bytes);
@@ -3905,6 +3907,60 @@ fn notice_bar(ui: &mut egui::Ui, t: &Tokens, icon: &str, icon_color: Color32, te
     });
 }
 
+/// Angerô: um botão da barra lateral (a ordem é configurável e fica salva em `rail_order`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RailItem {
+    Select,
+    Hand,
+    /// Um grupo de comentário (Comentar ▸, Destacar ▸, Desenhar ▸).
+    Group(usize),
+    Fill,
+}
+
+impl RailItem {
+    pub(crate) fn id(self) -> String {
+        match self {
+            RailItem::Select => "select".into(),
+            RailItem::Hand => "hand".into(),
+            RailItem::Group(g) => format!("group{g}"),
+            RailItem::Fill => "fill".into(),
+        }
+    }
+
+    fn parse(id: &str) -> Option<RailItem> {
+        match id {
+            "select" => Some(RailItem::Select),
+            "hand" => Some(RailItem::Hand),
+            "fill" => Some(RailItem::Fill),
+            _ => id.strip_prefix("group").and_then(|n| n.parse().ok()).filter(|g| *g < comments::GROUPS.len()).map(RailItem::Group),
+        }
+    }
+}
+
+/// Angerô: a ordem padrão da barra lateral.
+pub(crate) fn rail_default() -> Vec<RailItem> {
+    let mut v = vec![RailItem::Select, RailItem::Hand];
+    v.extend((0..comments::GROUPS.len()).map(RailItem::Group));
+    v.push(RailItem::Fill);
+    v
+}
+
+/// Angerô: os botões na ordem salva; os que faltarem (ordem antiga ou vazia) vão para o fim.
+pub(crate) fn rail_items(order: &[String]) -> Vec<RailItem> {
+    let mut v: Vec<RailItem> = Vec::new();
+    for item in order.iter().filter_map(|id| RailItem::parse(id)) {
+        if !v.contains(&item) {
+            v.push(item);
+        }
+    }
+    for item in rail_default() {
+        if !v.contains(&item) {
+            v.push(item);
+        }
+    }
+    v
+}
+
 /// The floating quick-action bar at the left edge of the document area.
 fn quick_bar(app: &mut PdfCraftApp, area: Rect, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
@@ -3919,137 +3975,164 @@ fn quick_bar(app: &mut PdfCraftApp, area: Rect, ui: &mut egui::Ui) {
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 2.0;
                 ui.vertical(|ui| {
-                    if icons::button(ui, "mouse-pointer-2", 32.0, app.quick_tool == QuickTool::Select, tl!("Select (V)")).clicked() {
-                        app.quick_tool = QuickTool::Select;
-                    }
-                    if icons::button(ui, "hand", 32.0, app.quick_tool == QuickTool::Hand, tl!("Hand (H)")).clicked() {
-                        app.quick_tool = QuickTool::Hand;
-                    }
-                    // Comment ▸, Highlight ▸, Draw ▸ (Acrobat's comment toolbar groups). Clicking a
-                    // group selects its last-used tool; clicking it again opens the flyout.
-                    for g in 0..comments::GROUPS.len() {
-                        let current = app.comment_prefs.group_tool[g];
-                        let active = matches!(app.quick_tool, QuickTool::Comment(t) if t.group() == g);
-                        let resp = icons::button(ui, current.icon(), 32.0, active, tl!(current.label()));
-                        // A small corner triangle marks the flyout.
-                        let r = resp.rect;
-                        let tri = [r.right_bottom() + vec2(-4.0, -4.0), r.right_bottom() + vec2(-9.0, -4.0), r.right_bottom() + vec2(-4.0, -9.0)];
-                        ui.painter().add(egui::Shape::convex_polygon(tri.to_vec(), if active { t.accent } else { t.text_faint }, Stroke::NONE));
-                        let open = (resp.clicked() && active) || resp.secondary_clicked();
-                        if resp.clicked() && !active {
-                            app.execute(current.command());
-                        }
-                        egui::Popup::menu(&resp)
-                            .open_memory(open.then_some(egui::SetOpenCommand::Toggle))
-                            .align(egui::RectAlign::RIGHT_START)
-                            .gap(6.0)
-                            .show(|ui| {
-                                for tool in comments::GROUPS[g] {
-                                    let on = app.quick_tool == QuickTool::Comment(*tool);
-                                    let (row, click) = ui.allocate_exact_size(vec2(180.0, 28.0), Sense::click());
-                                    let press = theme::Press::track(ui, &click);
-                                    press.wash(ui, row, 4, on);
-                                    let body = row.translate(press.offset());
-                                    icons::paint(ui, Rect::from_min_size(body.min + vec2(8.0, 6.0), vec2(16.0, 16.0)), tool.icon(), 16.0, t.text);
-                                    let reserve = if on { 28.0 } else { 8.0 };
-                                    crate::widgets::paint_left(
-                                        ui,
-                                        body.left_center() + vec2(34.0, 0.0),
-                                        tl!(tool.label()),
-                                        theme::regular(13.0),
-                                        t.text,
-                                        (row.width() - 34.0 - reserve).max(0.0),
-                                    );
-                                    if on {
-                                        icons::paint(
-                                            ui,
-                                            Rect::from_min_size(body.right_top() + vec2(-24.0, 7.0), vec2(14.0, 14.0)),
-                                            "check",
-                                            14.0,
-                                            t.accent,
-                                        );
-                                    }
-                                    let click = theme::hand(click);
-                                    let info = tl!(tool.label()).to_string();
-                                    click.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, on, info.clone()));
-                                    if click.clicked() {
-                                        app.execute(tool.command());
-                                        ui.close();
-                                    }
-                                }
-                            });
-                    }
-                    // Fill & Sign ▸ (text, marks, date, signature).
+                    // Angerô: os botões seguem a ordem que o usuário escolheu (Personalizar barra lateral).
                     let current_fill = match app.quick_tool {
                         QuickTool::Fill(f) => Some(f),
                         _ => None,
                     };
-                    let shown = current_fill.unwrap_or(crate::fill_sign::FillTool::Text);
-                    let resp = icons::button(
-                        ui,
-                        if current_fill.is_some() { shown.icon() } else { "pen-line" },
-                        32.0,
-                        current_fill.is_some(),
-                        tl!("Fill & Sign"),
-                    );
-                    let r = resp.rect;
-                    let tri = [r.right_bottom() + vec2(-4.0, -4.0), r.right_bottom() + vec2(-9.0, -4.0), r.right_bottom() + vec2(-4.0, -9.0)];
-                    ui.painter().add(egui::Shape::convex_polygon(
-                        tri.to_vec(),
-                        if current_fill.is_some() { t.accent } else { t.text_faint },
-                        Stroke::NONE,
-                    ));
-                    if resp.clicked() && current_fill.is_none() {
-                        app.execute(shown.command());
-                    }
-                    let open = (resp.clicked() && current_fill.is_some()) || resp.secondary_clicked();
-                    egui::Popup::menu(&resp)
-                        .open_memory(open.then_some(egui::SetOpenCommand::Toggle))
-                        .align(egui::RectAlign::RIGHT_START)
-                        .gap(6.0)
-                        .show(|ui| {
-                            for tool in crate::fill_sign::FILL_TOOLS {
-                                if matches!(tool, crate::fill_sign::FillTool::Signature | crate::fill_sign::FillTool::Initials) {
-                                    continue;
+                    for item in rail_items(&app.rail_order) {
+                        match item {
+                            RailItem::Select => {
+                                if icons::button(ui, "mouse-pointer-2", 32.0, app.quick_tool == QuickTool::Select, tl!("Select (V)")).clicked() {
+                                    app.quick_tool = QuickTool::Select;
                                 }
-                                let on = current_fill == Some(tool);
-                                let (row, click) = ui.allocate_exact_size(vec2(180.0, 28.0), Sense::click());
-                                let press = theme::Press::track(ui, &click);
-                                press.wash(ui, row, 4, on);
-                                let body = row.translate(press.offset());
-                                icons::paint(ui, Rect::from_min_size(body.min + vec2(8.0, 6.0), vec2(16.0, 16.0)), tool.icon(), 16.0, t.text);
-                                let reserve = if on { 28.0 } else { 8.0 };
-                                crate::widgets::paint_left(
+                            }
+                            RailItem::Hand => {
+                                if icons::button(ui, "hand", 32.0, app.quick_tool == QuickTool::Hand, tl!("Hand (H)")).clicked() {
+                                    app.quick_tool = QuickTool::Hand;
+                                }
+                            }
+                            RailItem::Group(g) => {
+                                let current = app.comment_prefs.group_tool[g];
+                                let active = matches!(app.quick_tool, QuickTool::Comment(t) if t.group() == g);
+                                let resp = icons::button(ui, current.icon(), 32.0, active, tl!(current.label()));
+                                // A small corner triangle marks the flyout.
+                                let r = resp.rect;
+                                let tri =
+                                    [r.right_bottom() + vec2(-4.0, -4.0), r.right_bottom() + vec2(-9.0, -4.0), r.right_bottom() + vec2(-4.0, -9.0)];
+                                ui.painter().add(egui::Shape::convex_polygon(
+                                    tri.to_vec(),
+                                    if active { t.accent } else { t.text_faint },
+                                    Stroke::NONE,
+                                ));
+                                let open = (resp.clicked() && active) || resp.secondary_clicked();
+                                if resp.clicked() && !active {
+                                    app.execute(current.command());
+                                }
+                                egui::Popup::menu(&resp)
+                                    .open_memory(open.then_some(egui::SetOpenCommand::Toggle))
+                                    .align(egui::RectAlign::RIGHT_START)
+                                    .gap(6.0)
+                                    .show(|ui| {
+                                        for tool in comments::GROUPS[g] {
+                                            let on = app.quick_tool == QuickTool::Comment(*tool);
+                                            let (row, click) = ui.allocate_exact_size(vec2(180.0, 28.0), Sense::click());
+                                            let press = theme::Press::track(ui, &click);
+                                            press.wash(ui, row, 4, on);
+                                            let body = row.translate(press.offset());
+                                            icons::paint(
+                                                ui,
+                                                Rect::from_min_size(body.min + vec2(8.0, 6.0), vec2(16.0, 16.0)),
+                                                tool.icon(),
+                                                16.0,
+                                                t.text,
+                                            );
+                                            let reserve = if on { 28.0 } else { 8.0 };
+                                            crate::widgets::paint_left(
+                                                ui,
+                                                body.left_center() + vec2(34.0, 0.0),
+                                                tl!(tool.label()),
+                                                theme::regular(13.0),
+                                                t.text,
+                                                (row.width() - 34.0 - reserve).max(0.0),
+                                            );
+                                            if on {
+                                                icons::paint(
+                                                    ui,
+                                                    Rect::from_min_size(body.right_top() + vec2(-24.0, 7.0), vec2(14.0, 14.0)),
+                                                    "check",
+                                                    14.0,
+                                                    t.accent,
+                                                );
+                                            }
+                                            let click = theme::hand(click);
+                                            let info = tl!(tool.label()).to_string();
+                                            click.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, on, info.clone()));
+                                            if click.clicked() {
+                                                app.execute(tool.command());
+                                                ui.close();
+                                            }
+                                        }
+                                    });
+                            }
+                            // Fill & Sign ▸ (text, marks, date, signature).
+                            RailItem::Fill => {
+                                let shown = current_fill.unwrap_or(crate::fill_sign::FillTool::Text);
+                                let resp = icons::button(
                                     ui,
-                                    body.left_center() + vec2(34.0, 0.0),
-                                    tl!(tool.label()),
-                                    theme::regular(13.0),
-                                    t.text,
-                                    (row.width() - 34.0 - reserve).max(0.0),
+                                    if current_fill.is_some() { shown.icon() } else { "pen-line" },
+                                    32.0,
+                                    current_fill.is_some(),
+                                    tl!("Fill & Sign"),
                                 );
-                                if on {
-                                    icons::paint(
-                                        ui,
-                                        Rect::from_min_size(body.right_top() + vec2(-24.0, 7.0), vec2(14.0, 14.0)),
-                                        "check",
-                                        14.0,
-                                        t.accent,
-                                    );
+                                let r = resp.rect;
+                                let tri =
+                                    [r.right_bottom() + vec2(-4.0, -4.0), r.right_bottom() + vec2(-9.0, -4.0), r.right_bottom() + vec2(-4.0, -9.0)];
+                                ui.painter().add(egui::Shape::convex_polygon(
+                                    tri.to_vec(),
+                                    if current_fill.is_some() { t.accent } else { t.text_faint },
+                                    Stroke::NONE,
+                                ));
+                                if resp.clicked() && current_fill.is_none() {
+                                    app.execute(shown.command());
                                 }
-                                let click = theme::hand(click);
-                                let info = tl!(tool.label()).to_string();
-                                click.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, on, info.clone()));
-                                if click.clicked() {
-                                    app.execute(tool.command());
-                                    ui.close();
-                                }
+                                let open = (resp.clicked() && current_fill.is_some()) || resp.secondary_clicked();
+                                egui::Popup::menu(&resp)
+                                    .open_memory(open.then_some(egui::SetOpenCommand::Toggle))
+                                    .align(egui::RectAlign::RIGHT_START)
+                                    .gap(6.0)
+                                    .show(|ui| {
+                                        for tool in crate::fill_sign::FILL_TOOLS {
+                                            if matches!(tool, crate::fill_sign::FillTool::Signature | crate::fill_sign::FillTool::Initials) {
+                                                continue;
+                                            }
+                                            let on = current_fill == Some(tool);
+                                            let (row, click) = ui.allocate_exact_size(vec2(180.0, 28.0), Sense::click());
+                                            let press = theme::Press::track(ui, &click);
+                                            press.wash(ui, row, 4, on);
+                                            let body = row.translate(press.offset());
+                                            icons::paint(
+                                                ui,
+                                                Rect::from_min_size(body.min + vec2(8.0, 6.0), vec2(16.0, 16.0)),
+                                                tool.icon(),
+                                                16.0,
+                                                t.text,
+                                            );
+                                            let reserve = if on { 28.0 } else { 8.0 };
+                                            crate::widgets::paint_left(
+                                                ui,
+                                                body.left_center() + vec2(34.0, 0.0),
+                                                tl!(tool.label()),
+                                                theme::regular(13.0),
+                                                t.text,
+                                                (row.width() - 34.0 - reserve).max(0.0),
+                                            );
+                                            if on {
+                                                icons::paint(
+                                                    ui,
+                                                    Rect::from_min_size(body.right_top() + vec2(-24.0, 7.0), vec2(14.0, 14.0)),
+                                                    "check",
+                                                    14.0,
+                                                    t.accent,
+                                                );
+                                            }
+                                            let click = theme::hand(click);
+                                            let info = tl!(tool.label()).to_string();
+                                            click.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, on, info.clone()));
+                                            if click.clicked() {
+                                                app.execute(tool.command());
+                                                ui.close();
+                                            }
+                                        }
+                                        ui.separator();
+                                        if let Some(command) = crate::fill_sign::signature_entries(ui, app, &t) {
+                                            app.execute(command);
+                                            ui.close();
+                                        }
+                                    });
                             }
-                            ui.separator();
-                            if let Some(command) = crate::fill_sign::signature_entries(ui, app, &t) {
-                                app.execute(command);
-                                ui.close();
-                            }
-                        });
+                        }
+                    }
                     if matches!(current_fill, Some(crate::fill_sign::FillTool::Text | crate::fill_sign::FillTool::Date)) {
                         ui.label(tl!("Font size:"));
                         ui.add(

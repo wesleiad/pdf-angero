@@ -497,19 +497,23 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     ui.spacing_mut().item_spacing.x = 4.0;
                     let has_doc = app.active.is_some();
                     ui.add_enabled_ui(has_doc, |ui| {
-                        let tip = crate::commands::command_tip(ui.ctx(), tl!("Print ({key})"), "print.dialog");
-                        if icons::button(ui, "printer", 32.0, false, &tip).clicked() {
-                            app.run_command("print.dialog");
-                        }
+                        // Angerô: Salvar e Imprimir em destaque, com ícone e texto.
                         let tip = crate::commands::command_tip(ui.ctx(), tl!("Save ({key})"), "file.save");
-                        if icons::button(ui, "save", 32.0, false, &tip).clicked() {
+                        if highlighted_button(ui, "save", tl!("Save"), t.accent, &tip).clicked() {
                             app.run_command("file.save");
                         }
+                        ui.add_space(2.0);
+                        let tip = crate::commands::command_tip(ui.ctx(), tl!("Print ({key})"), "print.dialog");
+                        if highlighted_button(ui, "printer", tl!("Print"), Color32::from_rgb(0x0e, 0x9f, 0x6e), &tip).clicked() {
+                            app.run_command("print.dialog");
+                        }
+                        ui.add_space(4.0);
                         let tip = crate::commands::command_tip(ui.ctx(), tl!("Document properties ({key})"), "file.properties");
                         if icons::button(ui, "info", 32.0, false, &tip).clicked() {
                             app.dialog = Some(Dialog::Properties(PropsTab::Description));
                         }
                     });
+                    rail_customizer(app, ui);
                     ui.add_space(8.0);
                     if widgets::search_box(ui, tl!("Find tools and commands"), 260.0).clicked() {
                         app.palette_open = true;
@@ -517,6 +521,74 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 });
             });
         });
+}
+
+/// Angerô: botão cheio, colorido, com ícone e texto (Salvar, Imprimir), para não passar despercebido.
+fn highlighted_button(ui: &mut egui::Ui, icon: &str, label: &str, fill: Color32, tip: &str) -> egui::Response {
+    let font = crate::theme::medium(13.0);
+    let galley = ui.painter().layout_no_wrap(label.to_string(), font, Color32::WHITE);
+    let size = egui::vec2(12.0 + 18.0 + 7.0 + galley.size().x + 14.0, 32.0);
+    let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
+    let enabled = ui.is_enabled();
+    let fill = if !enabled {
+        fill.gamma_multiply(0.45)
+    } else if resp.is_pointer_button_down_on() {
+        fill.gamma_multiply(0.8)
+    } else if resp.hovered() {
+        fill.gamma_multiply(0.9)
+    } else {
+        fill
+    };
+    ui.painter().rect_filled(rect, egui::CornerRadius::same(8), fill);
+    let icon_rect = Rect::from_center_size(egui::pos2(rect.left() + 12.0 + 9.0, rect.center().y), egui::vec2(18.0, 18.0));
+    icons::paint(ui, icon_rect, icon, 18.0, Color32::WHITE);
+    ui.painter().galley(egui::pos2(icon_rect.right() + 7.0, rect.center().y - galley.size().y / 2.0), galley, Color32::WHITE);
+    let info = label.to_string();
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, info.clone()));
+    crate::theme::hand(resp).on_hover_text(tip)
+}
+
+/// Angerô: "Personalizar barra lateral": muda a ordem dos botões da barra à esquerda do documento.
+fn rail_customizer(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+    let resp = icons::button(ui, "sliders-horizontal", 32.0, false, tl!("Customize side toolbar"));
+    egui::Popup::menu(&resp).close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside).show(|ui| {
+        ui.set_min_width(260.0);
+        ui.label(egui::RichText::new(tl!("Customize side toolbar")).strong());
+        ui.label(egui::RichText::new(tl!("Use the arrows to change the order of the buttons.")).small());
+        ui.separator();
+        let mut items = crate::canvas::rail_items(&app.rail_order);
+        let mut moved = None;
+        let n = items.len();
+        for (i, item) in items.iter().enumerate() {
+            let label = match item {
+                crate::canvas::RailItem::Select => tl!("Select (V)").to_string(),
+                crate::canvas::RailItem::Hand => tl!("Hand (H)").to_string(),
+                crate::canvas::RailItem::Group(g) => tl!(app.comment_prefs.group_tool[*g].label()).to_string(),
+                crate::canvas::RailItem::Fill => tl!("Fill & Sign").to_string(),
+            };
+            ui.horizontal(|ui| {
+                ui.add_enabled_ui(i > 0, |ui| {
+                    if icons::button(ui, "chevron-up", 24.0, false, tl!("Move up")).clicked() {
+                        moved = Some((i, i - 1));
+                    }
+                });
+                ui.add_enabled_ui(i + 1 < n, |ui| {
+                    if icons::button(ui, "chevron-down", 24.0, false, tl!("Move down")).clicked() {
+                        moved = Some((i, i + 1));
+                    }
+                });
+                ui.label(label);
+            });
+        }
+        if let Some((a, b)) = moved {
+            items.swap(a, b);
+            app.rail_order = items.iter().map(|i| i.id()).collect();
+        }
+        ui.separator();
+        if ui.button(tl!("Restore default order")).clicked() {
+            app.rail_order.clear();
+        }
+    });
 }
 
 fn main_menu(app: &mut PdfCraftApp, ui: &mut egui::Ui) {

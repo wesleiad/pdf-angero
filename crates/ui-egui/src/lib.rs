@@ -6,6 +6,8 @@
 //! `pdfcraft-engine`.
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
+// Angerô: o json! de `persist` passou do limite padrão (128) com a ordem da barra lateral.
+#![recursion_limit = "256"]
 
 /// Translate an English UI string into the current language (see [`i18n`]).
 macro_rules! tl {
@@ -524,6 +526,8 @@ pub struct PdfCraftApp {
     pub motion: motion::Motion,
     /// Interface language preference: `auto` (follow the system) or a code from [`i18n::LANGUAGES`].
     pub language: String,
+    /// Angerô: ordem dos botões da barra lateral (ids de `canvas::RailItem`); vazia = padrão.
+    pub rail_order: Vec<String>,
     /// Preferences ▸ Interface size as a factor, or `None` to follow [`Self::system_text_scale`].
     pub ui_scale: Option<f32>,
     /// The desktop's text scaling (GNOME's text scaling factor), which the desktop app reads at
@@ -864,6 +868,7 @@ impl PdfCraftApp {
             active: None,
             mode: Mode::AllTools,
             default_mode: Mode::AllTools,
+            rail_order: Vec::new(),
             view_defaults: Default::default(),
             units: Default::default(),
             date_format_draft: None,
@@ -2111,6 +2116,7 @@ impl PdfCraftApp {
             "scroll_speed": self.scroll_speed,
             "animation_effects": self.animation_effects,
             "default_mode": self.default_mode,
+            "rail_order": self.rail_order,
             "default_layout": canvas::display_token(self.view_defaults.layout, self.view_defaults.continuous),
             "default_zoom": self.view_defaults.zoom_name(),
             "highlight_fields": self.view_defaults.highlight_fields,
@@ -2206,6 +2212,9 @@ impl PdfCraftApp {
         }
         if let Ok(mode) = serde_json::from_value::<Mode>(v["default_mode"].clone()) {
             self.default_mode = mode;
+        }
+        if let Ok(order) = serde_json::from_value::<Vec<String>>(v["rail_order"].clone()) {
+            self.rail_order = order;
         }
         if let Some((layout, continuous)) = v["default_layout"].as_str().and_then(canvas::parse_display_token) {
             (self.view_defaults.layout, self.view_defaults.continuous) = (layout, continuous);
