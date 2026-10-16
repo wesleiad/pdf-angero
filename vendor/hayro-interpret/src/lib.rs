@@ -43,6 +43,8 @@ mod types;
 mod x_object;
 /// PdfCraft patch: exported for its regression test.
 pub use x_object::image_size_ok;
+/// Angerô: modo leve para PCs com pouca memória.
+pub use x_object::{low_memory, total_ram};
 
 pub mod color;
 pub mod encode;

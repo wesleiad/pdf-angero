@@ -20,6 +20,8 @@ pub use inspect::{
     RemoteDestination, Xfa, attachment_data, check_pages, inspect, pretty_date,
 };
 pub use pixels::Pixels;
+/// Angerô: modo leve para PCs com pouca memória (ver `hayro_interpret::low_memory`).
+pub use hayro::hayro_interpret::{low_memory, total_ram};
 pub use raster::{
     MAX_PIXELS, MAX_SIDE, PRINT_TAG, PageRenderer, RenderConfig, RenderPool, RenderRequest, RenderStats, RenderWarning, RenderedPage, RequestKind,
     Retiring, Tile, device_pixels, effective_scale,

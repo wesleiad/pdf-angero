@@ -111,3 +111,43 @@ pub mod reader;
 pub use data::PdfData;
 pub use filter::*;
 pub use pdf::*;
+
+/// Angerô: RAM física total, em bytes (para o modo leve em PCs com pouca memória).
+#[cfg(windows)]
+pub fn total_ram() -> Option<u64> {
+    #[repr(C)]
+    struct MemoryStatusEx {
+        length: u32,
+        memory_load: u32,
+        total_phys: u64,
+        avail_phys: u64,
+        total_page_file: u64,
+        avail_page_file: u64,
+        total_virtual: u64,
+        avail_virtual: u64,
+        avail_extended_virtual: u64,
+    }
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GlobalMemoryStatusEx(buffer: *mut MemoryStatusEx) -> i32;
+    }
+    let mut m = MemoryStatusEx {
+        length: size_of::<MemoryStatusEx>() as u32,
+        memory_load: 0,
+        total_phys: 0,
+        avail_phys: 0,
+        total_page_file: 0,
+        avail_page_file: 0,
+        total_virtual: 0,
+        avail_virtual: 0,
+        avail_extended_virtual: 0,
+    };
+    // SAFETY: `m` is a MEMORYSTATUSEX with `length` set, as the API requires.
+    (unsafe { GlobalMemoryStatusEx(&mut m) } != 0).then_some(m.total_phys)
+}
+
+/// Angerô: RAM física total (só no Windows; nos outros sistemas, desconhecida).
+#[cfg(not(windows))]
+pub fn total_ram() -> Option<u64> {
+    None
+}

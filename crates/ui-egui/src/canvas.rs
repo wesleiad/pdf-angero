@@ -48,6 +48,24 @@ const RESULTS_PER_FRAME: usize = 8;
 const MAX_THUMB_DEMAND: usize = 256;
 /// At most this many whole-page rasters are cached beyond the ones on screen.
 const MAX_CACHED_PAGES: usize = 24;
+
+/// Angerô: no modo leve (PC com pouca memória, `pdfcraft_render::low_memory`) os caches de páginas,
+/// blocos e miniaturas ficam menores; fora dele valem as constantes acima.
+fn memoria_baixa() -> bool {
+    pdfcraft_render::low_memory()
+}
+fn limite_miniaturas() -> usize {
+    if memoria_baixa() { 12 * 1024 * 1024 } else { THUMB_BYTES }
+}
+fn limite_paginas() -> usize {
+    if memoria_baixa() { 48 * 1024 * 1024 } else { PAGE_BYTES }
+}
+fn limite_blocos() -> usize {
+    if memoria_baixa() { 48 * 1024 * 1024 } else { TILE_BYTES }
+}
+fn max_paginas_guardadas() -> usize {
+    if memoria_baixa() { 8 } else { MAX_CACHED_PAGES }
+}
 /// At most this many text layers are cached beyond visible, selected and matched pages.
 /// Text layers are glyph structs, far smaller than rasters; deliberately independent of
 /// `MAX_CACHED_PAGES` so raster tuning never silently retunes text memory.
@@ -493,7 +511,7 @@ fn sharp_enough(have: u32, want: f32) -> bool {
 
 /// Thumbnail device-pixel density when `demand` pages share the thumbnail allowance.
 fn thumbnail_density(demand: usize, ppp: f32) -> f32 {
-    let per_thumb = THUMB_BYTES / demand.max(1).next_power_of_two();
+    let per_thumb = limite_miniaturas() / demand.max(1).next_power_of_two();
     ppp.clamp(0.25, 4.0).min((per_thumb as f32 / (4.0 * THUMB_W * THUMB_H)).sqrt() * 0.98)
 }
 
@@ -1419,7 +1437,7 @@ impl DocView {
                 // (`tile_side`), so grid indices would need the scale to decode.
                 let key = (req.page, req.tag, tile.x, tile.y);
                 let bytes = rgba_bytes(tile.w as usize, tile.h as usize);
-                if (!visible && tile_bytes.saturating_add(bytes) > TILE_BYTES) || !tiles.insert(key) {
+                if (!visible && tile_bytes.saturating_add(bytes) > limite_blocos()) || !tiles.insert(key) {
                     continue;
                 }
                 tile_bytes = tile_bytes.saturating_add(bytes);
@@ -1429,7 +1447,7 @@ impl DocView {
                 }
             } else {
                 let bytes = rgba_bytes(device_pixels(p.width, req.scale) as usize, device_pixels(p.height, req.scale) as usize);
-                if (!visible && (page_bytes.saturating_add(bytes) > PAGE_BYTES || pages.len() >= MAX_CACHED_PAGES)) || !pages.insert(req.page) {
+                if (!visible && (page_bytes.saturating_add(bytes) > limite_paginas() || pages.len() >= max_paginas_guardadas())) || !pages.insert(req.page) {
                     continue;
                 }
                 page_bytes = page_bytes.saturating_add(bytes);
@@ -1445,7 +1463,7 @@ impl DocView {
         let mut kept = pages.len();
         for page in undemanded {
             let bytes = self.pages.get(&page).map_or(0, |p| texture_bytes(&p.tex));
-            if kept < MAX_CACHED_PAGES && page_bytes.saturating_add(bytes) <= PAGE_BYTES {
+            if kept < max_paginas_guardadas() && page_bytes.saturating_add(bytes) <= limite_paginas() {
                 page_bytes = page_bytes.saturating_add(bytes);
                 kept += 1;
                 pages.insert(page);
@@ -1478,7 +1496,7 @@ impl DocView {
         for req in thumbs {
             let Some(p) = info.pages.get(req.page) else { continue };
             let bytes = rgba_bytes(device_pixels(p.width, req.scale) as usize, device_pixels(p.height, req.scale) as usize);
-            if thumb_bytes.saturating_add(bytes) > THUMB_BYTES || self.errors.contains_key(&req.page) {
+            if thumb_bytes.saturating_add(bytes) > limite_miniaturas() || self.errors.contains_key(&req.page) {
                 continue;
             }
             thumb_bytes += bytes;
@@ -1645,10 +1663,10 @@ impl DocView {
             let key = (req.page, req.tag, t.x, t.y);
             self.tiles.remove(&key);
             let retained = self.tiles.values().fold(0usize, |n, tex| n.saturating_add(texture_bytes(tex)));
-            visible || bytes <= TILE_BYTES.saturating_sub(retained)
+            visible || bytes <= limite_blocos().saturating_sub(retained)
         } else {
             let thumb = req.tag & THUMB_TAG != 0;
-            let (cache, limit) = if thumb { (&mut self.thumbs, THUMB_BYTES) } else { (&mut self.pages, PAGE_BYTES) };
+            let (cache, limit) = if thumb { (&mut self.thumbs, limite_miniaturas()) } else { (&mut self.pages, limite_paginas()) };
             cache.remove(&req.page);
             let mut retained = cache.values().fold(0usize, |n, p| n.saturating_add(texture_bytes(&p.tex)));
             // A zoom/DPI change can temporarily retain larger stale images than the new

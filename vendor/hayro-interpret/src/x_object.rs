@@ -358,9 +358,9 @@ impl<'a> ImageXObject<'a> {
         };
         cache.get_or_insert_with(
             self.decode_key(cache, true, target_dimension),
-            MAX_DECODED_IMAGE_BYTES,
+            max_decoded_image_bytes(),
             decoded_mask_size,
-            || decode_mask(self, target_dimension),
+            || one_large_at_a_time(self, || decode_mask(self, target_dimension)),
         )
     }
 
@@ -378,9 +378,9 @@ impl<'a> ImageXObject<'a> {
         };
         cache.get_or_insert_with(
             self.decode_key(cache, false, target_dimension),
-            MAX_DECODED_IMAGE_BYTES,
+            max_decoded_image_bytes(),
             decoded_raster_size,
-            || decode_raster(self, target_dimension),
+            || one_large_at_a_time(self, || decode_raster(self, target_dimension)),
         )
     }
 
@@ -434,6 +434,37 @@ impl<'a> ImageXObject<'a> {
 /// PdfCraft patch: budget for [`DecodedImageCache`] entries per interpreter cache: decoded
 /// image pixels shared across tiles and scales. Past it the cache starts a fresh epoch.
 const MAX_DECODED_IMAGE_BYTES: usize = 64 << 20;
+
+/// Angerô: modo leve para PCs com pouca memória (até 6 GB de RAM): caches menores, um
+/// desenhista, uma foto grande decodificada por vez. `PDFANGERO_MEMORIA=baixa|normal` força um
+/// dos dois. Decidido uma vez por processo.
+pub fn low_memory() -> bool {
+    static LOW: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *LOW.get_or_init(|| match std::env::var("PDFANGERO_MEMORIA").ok().as_deref() {
+        Some("baixa") => true,
+        Some("normal") => false,
+        _ => hayro_syntax::total_ram().is_some_and(|b| b <= 6 << 30),
+    })
+}
+
+pub use hayro_syntax::total_ram;
+
+/// Angerô: no modo leve o cache de imagens decodificadas guarda menos.
+fn max_decoded_image_bytes() -> usize {
+    if low_memory() { 24 << 20 } else { MAX_DECODED_IMAGE_BYTES }
+}
+
+/// Angerô: no modo leve, imagens grandes (a partir de 4 megapixels: uma foto de catálogo abre
+/// em tamanho cheio, ~90 MB) são decodificadas uma por vez no processo inteiro, para que
+/// páginas, blocos e miniaturas em paralelo não somem picos de várias delas.
+fn one_large_at_a_time<T>(obj: &ImageXObject<'_>, decode: impl FnOnce() -> T) -> T {
+    static GATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    if !low_memory() || (obj.width as u64) * (obj.height as u64) < 4_000_000 {
+        return decode();
+    }
+    let _guard = GATE.lock().unwrap_or_else(|e| e.into_inner());
+    decode()
+}
 
 /// PdfCraft patch: pixel bytes held by a decoded mask.
 fn decoded_mask_size(mask: &DecodedMask) -> usize {

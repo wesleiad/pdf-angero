@@ -843,7 +843,14 @@ fn shown_under_redactions(
     Ok(())
 }
 
+/// Angerô: modo leve para PCs com pouca memória.
+pub use pdfcraft_render::{low_memory, total_ram};
+
 fn render_threads() -> usize {
+    // Angerô: no modo leve (PC com pouca memória) um desenhista só: cada um segura fotos decodificadas.
+    if pdfcraft_render::low_memory() {
+        return 1;
+    }
     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(2, 8) - 1
 }
 

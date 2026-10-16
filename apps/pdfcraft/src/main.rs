@@ -156,9 +156,17 @@ fn rejoin_split_paths(args: Vec<String>, exists: impl Fn(&str) -> bool) -> Vec<S
     out
 }
 
+/// Angerô: registra no log se o modo leve (PC com pouca memória) está ligado.
+fn detectar_pouca_memoria() {
+    let total = pdfcraft_engine::total_ram().map_or(0, |b| b >> 20);
+    let modo = if pdfcraft_engine::low_memory() { "leve (pouca memória)" } else { "normal" };
+    log::info!("RAM total {total} MB: modo {modo}");
+}
+
 fn main() -> eframe::Result {
     // First, so the panic hook and every start-up warning are recorded (`logging`).
     let logger = logging::install();
+    detectar_pouca_memoria();
     // Last-resort guard (AGENTS.md §4): commands, edits, opens and saves catch panics and report
     // them; this hook logs every panic, caught or not, with a backtrace when RUST_BACKTRACE is set.
     std::panic::set_hook(Box::new(|info| {
