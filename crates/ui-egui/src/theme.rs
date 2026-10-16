@@ -70,27 +70,28 @@ pub struct Tokens {
 impl Tokens {
     pub fn for_kind(kind: ThemeKind) -> Self {
         match kind {
+            // Angerô: identidade "Lua Nova" (bege, tinta anil, destaque anil da Angerô).
             ThemeKind::Light => Self {
                 kind,
-                titlebar: Color32::from_rgb(0xE9, 0xE9, 0xEB),
-                chrome: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-                panel: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-                pasteboard: Color32::from_rgb(0xF1, 0xF1, 0xF3),
+                titlebar: Color32::from_rgb(0xE4, 0xE1, 0xD0),
+                chrome: Color32::from_rgb(0xF7, 0xF5, 0xEC),
+                panel: Color32::from_rgb(0xF9, 0xF7, 0xF0),
+                pasteboard: Color32::from_rgb(0xEE, 0xEC, 0xDE),
                 card: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-                border: Color32::from_rgb(0xDA, 0xDA, 0xDE),
-                divider: Color32::from_rgb(0xE8, 0xE8, 0xEB),
-                text: Color32::from_rgb(0x22, 0x22, 0x26),
-                text_muted: Color32::from_rgb(0x5E, 0x5E, 0x66),
-                text_faint: Color32::from_rgb(0x6B, 0x6B, 0x73),
-                icon: Color32::from_rgb(0x44, 0x44, 0x4B),
-                hover: Color32::from_rgb(0xF0, 0xF0, 0xF3),
-                pressed: Color32::from_rgb(0xE4, 0xE4, 0xE9),
-                selected: Color32::from_rgb(0xE6, 0xEE, 0xFD),
-                accent: Color32::from_rgb(0x1B, 0x63, 0xE0),
-                accent_text: Color32::from_rgb(0x17, 0x55, 0xC4),
-                accent_soft: Color32::from_rgb(0xE3, 0xEC, 0xFD),
+                border: Color32::from_rgb(0xD9, 0xD4, 0xC2),
+                divider: Color32::from_rgb(0xE5, 0xE1, 0xD1),
+                text: Color32::from_rgb(0x1E, 0x23, 0x4D),
+                text_muted: Color32::from_rgb(0x4E, 0x54, 0x78),
+                text_faint: Color32::from_rgb(0x6E, 0x72, 0x90),
+                icon: Color32::from_rgb(0x2B, 0x3A, 0x8F),
+                hover: Color32::from_rgb(0xEC, 0xE6, 0xF6),
+                pressed: Color32::from_rgb(0xDF, 0xD8, 0xF0),
+                selected: Color32::from_rgb(0xDE, 0xE5, 0xFA),
+                accent: Color32::from_rgb(0x2B, 0x3A, 0x8F),
+                accent_text: Color32::from_rgb(0x2B, 0x3A, 0x8F),
+                accent_soft: Color32::from_rgb(0xDE, 0xE5, 0xFA),
                 field: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-                badge_new: Color32::from_rgb(0x1B, 0x63, 0xE0),
+                badge_new: Color32::from_rgb(0xEE, 0x63, 0xA0),
                 page_shadow: Color32::from_black_alpha(34),
                 radius: 6,
             },
@@ -119,6 +120,25 @@ impl Tokens {
                 radius: 6,
             },
         }
+    }
+
+    /// Angerô: o destaque escolhido pelo usuário (Exibir › Tema › Cor de destaque), sobre a paleta.
+    fn with_custom_accent(mut self) -> Self {
+        if let Some(c) = custom_accent() {
+            let mix = |a: Color32, b: Color32, t: f32| {
+                let m = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round() as u8;
+                Color32::from_rgb(m(a.r(), b.r()), m(a.g(), b.g()), m(a.b(), b.b()))
+            };
+            let base = if self.dark() { Color32::from_rgb(0x1E, 0x1E, 0x22) } else { Color32::WHITE };
+            self.accent = c;
+            self.accent_text = if self.dark() { mix(c, Color32::WHITE, 0.35) } else { c };
+            self.accent_soft = mix(base, c, if self.dark() { 0.35 } else { 0.16 });
+            self.selected = self.accent_soft;
+            if !self.dark() {
+                self.icon = c;
+            }
+        }
+        self
     }
 
     pub fn get(ctx: &egui::Context) -> Self {
@@ -302,6 +322,10 @@ fn current_font_policy_platform() -> FontPolicyPlatform {
 
 fn primary_font_tweak(platform: FontPolicyPlatform, name: &str) -> FontTweak {
     let mut tweak = FontTweak::default();
+    // Angerô: a Montserrat (apelidos Inter*) entra a 94% para caber como a fonte anterior.
+    if name.starts_with("Inter") {
+        tweak.scale = 0.94;
+    }
     if platform == FontPolicyPlatform::Windows && name == "JetBrainsMono" {
         tweak.hinting_target = HintingTarget::Smooth(SmoothHinting { symmetric_rendering: false, ..SmoothHinting::default() });
     }
@@ -320,9 +344,10 @@ fn font_definitions_for_platform(prefer_hans: bool, platform: FontPolicyPlatform
         fonts.font_data.insert(name.to_owned(), Arc::new(data));
     };
     // Shared with typed signatures' fallback glyphs, so the font is embedded once.
-    add(&mut fonts, "Inter", pdfcraft_fonts::INTER_REGULAR);
-    add(&mut fonts, "Inter-Medium", include_bytes!("../../../assets/fonts/Inter-Medium.ttf"));
-    add(&mut fonts, "Inter-SemiBold", include_bytes!("../../../assets/fonts/Inter-SemiBold.ttf"));
+    // Angerô: a interface usa Montserrat (identidade Lua Nova); os nomes "Inter*" ficam como apelidos.
+    add(&mut fonts, "Inter", include_bytes!("../../../assets/fonts/Montserrat-Regular.ttf"));
+    add(&mut fonts, "Inter-Medium", include_bytes!("../../../assets/fonts/Montserrat-Medium.ttf"));
+    add(&mut fonts, "Inter-SemiBold", include_bytes!("../../../assets/fonts/Montserrat-SemiBold.ttf"));
     add(&mut fonts, "JetBrainsMono", include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf"));
     fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "Inter".to_owned());
     fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "JetBrainsMono".to_owned());
@@ -376,12 +401,26 @@ pub fn semibold(size: f32) -> FontId {
     FontId::new(size, FontFamily::Name("semibold".into()))
 }
 
+static CUSTOM_ACCENT: std::sync::Mutex<Option<[u8; 3]>> = std::sync::Mutex::new(None);
+
+/// Angerô: a cor de destaque escolhida pelo usuário (`None`: a da identidade Lua Nova).
+pub fn custom_accent() -> Option<Color32> {
+    CUSTOM_ACCENT.lock().ok().and_then(|c| *c).map(|[r, g, b]| Color32::from_rgb(r, g, b))
+}
+
+/// Angerô: muda a cor de destaque (vale no próximo `apply`).
+pub fn set_custom_accent(color: Option<[u8; 3]>) {
+    if let Ok(mut c) = CUSTOM_ACCENT.lock() {
+        *c = color;
+    }
+}
+
 pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
     // Keep the native window inherited. A concrete egui theme pins macOS's
     // NSWindow appearance and prevents winit from delivering ThemeChanged.
     // Our saved choice owns the palette; both egui branches receive it below.
     ctx.set_theme(egui::ThemePreference::System);
-    let t = Tokens::for_kind(kind);
+    let t = Tokens::for_kind(kind).with_custom_accent();
     ctx.data_mut(|d| d.insert_temp(egui::Id::new("pdfcraft-theme"), t));
     let mut v = if t.dark() { Visuals::dark() } else { Visuals::light() };
     v.panel_fill = t.panel;

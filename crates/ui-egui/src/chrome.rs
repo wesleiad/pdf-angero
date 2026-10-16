@@ -298,13 +298,29 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
 fn theme_menu(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     for (preference, command, label) in [
         (ThemePreference::System, "view.theme.system", "Use system setting"),
-        (ThemePreference::Light, "view.theme.light", "Light gray"),
+        (ThemePreference::Light, "view.theme.light", "Lua Nova (Angerô)"),
         (ThemePreference::Dark, "view.theme.dark", "Dark gray"),
     ] {
         if ui.add(widgets::radio(app.theme_preference == preference, tl!(label))).clicked() {
             app.execute(command);
             ui.close();
         }
+    }
+    ui.separator();
+    // Angerô: cor de destaque escolhida pelo usuário (botões, seleção, ícones), salva nas preferências.
+    ui.horizontal(|ui| {
+        let atual = crate::theme::custom_accent().unwrap_or(Tokens::for_kind(crate::theme::ThemeKind::Light).accent);
+        let mut rgb = [atual.r(), atual.g(), atual.b()];
+        ui.label(tl!("Accent color"));
+        if ui.color_edit_button_srgb(&mut rgb).changed() {
+            crate::theme::set_custom_accent(Some(rgb));
+            crate::theme::apply(ui.ctx(), app.theme);
+        }
+    });
+    if ui.add_enabled(crate::theme::custom_accent().is_some(), egui::Button::new(tl!("Angerô default colors"))).clicked() {
+        crate::theme::set_custom_accent(None);
+        crate::theme::apply(ui.ctx(), app.theme);
+        ui.close();
     }
     ui.separator();
     if ui.button(tl!("Appearance settings…")).clicked() {
@@ -514,6 +530,7 @@ pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         }
                     });
                     rail_customizer(app, ui);
+                    theme_color_button(app, ui);
                     ui.add_space(8.0);
                     if widgets::search_box(ui, tl!("Find tools and commands"), 260.0).clicked() {
                         app.palette_open = true;
@@ -546,6 +563,25 @@ fn highlighted_button(ui: &mut egui::Ui, icon: &str, label: &str, fill: Color32,
     let info = label.to_string();
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, info.clone()));
     crate::theme::hand(resp).on_hover_text(tip)
+}
+
+/// Angerô: botão "Cor do tema": escolhe a cor de destaque (salva nas preferências) ou volta às cores Angerô.
+fn theme_color_button(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+    let resp = icons::button(ui, "palette", 32.0, false, tl!("Theme color"));
+    egui::Popup::menu(&resp).close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside).show(|ui| {
+        ui.label(egui::RichText::new(tl!("Theme color")).strong());
+        let atual = crate::theme::custom_accent().unwrap_or(Tokens::for_kind(app.theme).accent);
+        let mut rgb = [atual.r(), atual.g(), atual.b()];
+        if ui.color_edit_button_srgb(&mut rgb).changed() {
+            crate::theme::set_custom_accent(Some(rgb));
+            crate::theme::apply(ui.ctx(), app.theme);
+        }
+        if ui.add_enabled(crate::theme::custom_accent().is_some(), egui::Button::new(tl!("Angerô default colors"))).clicked() {
+            crate::theme::set_custom_accent(None);
+            crate::theme::apply(ui.ctx(), app.theme);
+            ui.close();
+        }
+    });
 }
 
 /// Angerô: "Personalizar barra lateral": muda a ordem dos botões da barra à esquerda do documento.

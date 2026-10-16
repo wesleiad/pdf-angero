@@ -2113,6 +2113,8 @@ impl PdfCraftApp {
             "system_title_bar": self.system_title_bar,
             "pinned_folders": self.pinned.folders,
             "theme": self.theme_preference,
+            "accent_color": theme::custom_accent().map(|c| [c.r(), c.g(), c.b()]),
+            "angero_tema": 1,
             "scroll_speed": self.scroll_speed,
             "animation_effects": self.animation_effects,
             "default_mode": self.default_mode,
@@ -2201,7 +2203,12 @@ impl PdfCraftApp {
             self.reload_changed_files = on;
         }
         self.pinned.restore(&v["pinned_folders"]);
-        if let Ok(preference) = serde_json::from_value::<ThemePreference>(v["theme"].clone()) {
+        theme::set_custom_accent(serde_json::from_value::<[u8; 3]>(v["accent_color"].clone()).ok());
+        // Angerô: a identidade "Lua Nova" (tema claro) é o padrão; uma vez por instalação, quem vinha
+        // com outro tema passa para ela (depois disso, a escolha da pessoa vale).
+        if v["angero_tema"].as_u64().unwrap_or(0) < 1 {
+            self.set_theme_preference(ThemePreference::Light);
+        } else if let Ok(preference) = serde_json::from_value::<ThemePreference>(v["theme"].clone()) {
             self.set_theme_preference(preference);
         }
         if let Ok(speed) = serde_json::from_value::<scroll_speed::ScrollSpeed>(v["scroll_speed"].clone()) {
