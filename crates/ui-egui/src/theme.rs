@@ -82,7 +82,7 @@ impl Tokens {
                 divider: Color32::from_rgb(0xE5, 0xE1, 0xD1),
                 text: Color32::from_rgb(0x1E, 0x23, 0x4D),
                 text_muted: Color32::from_rgb(0x4E, 0x54, 0x78),
-                text_faint: Color32::from_rgb(0x6E, 0x72, 0x90),
+                text_faint: Color32::from_rgb(0x58, 0x5C, 0x7C),
                 icon: Color32::from_rgb(0x2B, 0x3A, 0x8F),
                 hover: Color32::from_rgb(0xEC, 0xE6, 0xF6),
                 pressed: Color32::from_rgb(0xDF, 0xD8, 0xF0),
@@ -388,6 +388,14 @@ fn font_definitions_for_platform(prefer_hans: bool, platform: FontPolicyPlatform
         stack.extend(fallback.iter().cloned());
         fonts.families.insert(FontFamily::Name(fam.into()), stack);
     }
+    // Angerô: a Montserrat não tem alguns símbolos (setas, ▸, ✓…) que a fonte anterior tinha; ela
+    // fica logo depois, de reserva, em toda pilha que começa pela Montserrat.
+    fonts.font_data.insert("AngeroReserva".into(), Arc::new(FontData::from_static(pdfcraft_fonts::INTER_REGULAR)));
+    for stack in fonts.families.values_mut() {
+        if let Some(i) = stack.iter().position(|n| n.starts_with("Inter")) {
+            stack.insert(i + 1, "AngeroReserva".into());
+        }
+    }
     fonts
 }
 
@@ -598,7 +606,9 @@ mod tests {
         for (family, name) in primary_families() {
             let baseline_data = &baseline.font_data[name];
             let windows_data = &windows.font_data[name];
-            assert_eq!(baseline_data.tweak, FontTweak::default(), "baseline {name}");
+            // Angerô: a Montserrat (apelidos Inter*) entra a 94% em todas as plataformas.
+            let base = if name.starts_with("Inter") { FontTweak { scale: 0.94, ..FontTweak::default() } } else { FontTweak::default() };
+            assert_eq!(baseline_data.tweak, base, "baseline {name}");
             if name == "JetBrainsMono" {
                 assert_eq!(
                     windows_data.tweak,
